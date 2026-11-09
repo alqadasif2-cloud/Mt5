@@ -18,7 +18,7 @@ export const HistoryView: React.FC = () => {
   const totalProfit = historyDeals.reduce((sum, d) => sum + d.profit, 0);
   const totalCommission = historyDeals.reduce((sum, d) => sum + d.commission, 0);
   const totalSwap = historyDeals.reduce((sum, d) => sum + d.swap, 0);
-  const deposit = 1000.00;
+  const deposit = activeAccount.balance - totalProfit;
   const withdrawal = 0.00;
 
   return (
