@@ -415,7 +415,7 @@ export const InteractiveChart: React.FC = () => {
           {currentQuote?.source && (
             <span className="hidden sm:flex text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 px-1.5 py-0.5 rounded font-mono font-bold items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
-              Binance
+              {currentQuote.source}
             </span>
           )}
         </div>

@@ -102,14 +102,29 @@ const INITIAL_QUOTES: SymbolQuote[] = [
     symbol: 'XAUUSD',
     name: 'الذهب مقابل الدولار الأمريكي',
     digits: 2,
-    bid: 4106.00,
-    ask: 4106.20,
+    bid: 4132.77,
+    ask: 4132.97,
     spread: 20,
-    high: 4118.50,
-    low: 4092.30,
+    high: 4133.60,
+    low: 4054.85,
     time: '15:58:22',
-    change: 0.65,
-    category: 'metals'
+    change: 1.64,
+    category: 'metals',
+    source: 'Twelve Data API'
+  },
+  {
+    symbol: 'XAGUSD',
+    name: 'الفضة مقابل الدولار الأمريكي',
+    digits: 3,
+    bid: 46.870,
+    ask: 46.885,
+    spread: 15,
+    high: 47.130,
+    low: 46.340,
+    time: '15:58:22',
+    change: -0.13,
+    category: 'metals',
+    source: 'Twelve Data API'
   },
   {
     symbol: 'EURUSD',
@@ -394,6 +409,81 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   }, []);
 
+  // Live Twelve Data API feed for Gold (XAUUSD) & Silver (XAGUSD)
+  useEffect(() => {
+    const TWELVE_DATA_KEY = 'f348542a01f64309aeb042123ffccf54';
+    let isCancelled = false;
+
+    const fetchMetals = () => {
+      fetch(`https://api.twelvedata.com/quote?symbol=XAU/USD,SLV&apikey=${TWELVE_DATA_KEY}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (isCancelled || !data) return;
+
+          const now = new Date();
+          const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+          setQuotes((prev) =>
+            prev.map((q) => {
+              // 1. Gold XAUUSD from Twelve Data
+              if (q.symbol === 'XAUUSD' && data['XAU/USD'] && data['XAU/USD'].close) {
+                const gold = data['XAU/USD'];
+                const price = parseFloat(gold.close);
+                const isUp = price >= q.bid;
+                const high = parseFloat(gold.high) || Math.max(q.high, price);
+                const low = parseFloat(gold.low) || Math.min(q.low, price);
+                const change = parseFloat(gold.percent_change) || q.change;
+                return {
+                  ...q,
+                  bid: parseFloat(price.toFixed(2)),
+                  ask: parseFloat((price + 0.20).toFixed(2)),
+                  high,
+                  low,
+                  change,
+                  time: timeStr,
+                  tickDirection: isUp ? 'up' : 'down'
+                };
+              }
+
+              // 2. Silver XAGUSD from Twelve Data (SLV / Silver Spot)
+              if (q.symbol === 'XAGUSD' && data['SLV'] && data['SLV'].close) {
+                const silver = data['SLV'];
+                const price = parseFloat(silver.close);
+                const isUp = price >= q.bid;
+                const high = parseFloat(silver.high) || Math.max(q.high, price);
+                const low = parseFloat(silver.low) || Math.min(q.low, price);
+                const change = parseFloat(silver.percent_change) || q.change;
+                return {
+                  ...q,
+                  bid: parseFloat(price.toFixed(3)),
+                  ask: parseFloat((price + 0.015).toFixed(3)),
+                  high,
+                  low,
+                  change,
+                  time: timeStr,
+                  tickDirection: isUp ? 'up' : 'down'
+                };
+              }
+
+              return q;
+            })
+          );
+        })
+        .catch((err) => {
+          console.log('Twelve Data metals fetch error:', err);
+        });
+    };
+
+    fetchMetals();
+    // Poll every 30 seconds to respect Twelve Data free limits
+    const intervalId = setInterval(fetchMetals, 30000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, []);
+
   // Live ticking simulation for forex/metals (BTCUSD excluded as it has Binance live feed!)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -449,6 +539,11 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
           profit = pos.type === 'buy'
             ? (currentPrice - pos.openPrice) * 100 * pos.lots
             : (pos.openPrice - currentPrice) * 100 * pos.lots;
+        } else if (pos.symbol === 'XAGUSD') {
+          // Silver: 1 lot = 5000 oz. Difference * 5000 * lots
+          profit = pos.type === 'buy'
+            ? (currentPrice - pos.openPrice) * 5000 * pos.lots
+            : (pos.openPrice - currentPrice) * 5000 * pos.lots;
         } else if (pos.symbol === 'BTCUSD') {
           // BTC: 1 lot = 1 BTC
           profit = pos.type === 'buy'
@@ -485,7 +580,12 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const margin = parseFloat(
     positions
       .reduce((sum, p) => {
-        const notional = p.symbol === 'XAUUSD' ? p.lots * 100 * p.openPrice : p.lots * 100000;
+        const notional =
+          p.symbol === 'XAUUSD'
+            ? p.lots * 100 * p.openPrice
+            : p.symbol === 'XAGUSD'
+            ? p.lots * 5000 * p.openPrice
+            : p.lots * 100000;
         return sum + notional / leverageRatio;
       }, 0)
       .toFixed(2)

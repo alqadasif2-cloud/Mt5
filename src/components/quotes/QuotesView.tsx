@@ -149,7 +149,7 @@ export const QuotesView: React.FC = () => {
                   {q.source && (
                     <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-1.5 py-0.2 rounded font-mono font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
-                      Binance Live
+                      {q.source}
                     </span>
                   )}
                   {isSelected && (
